@@ -1,6 +1,6 @@
 # Preface
 
-我经常用 fugitive 查看 git 日志时，每次打开 commit 详情都是以 unified 的形式显示每个 commit 的改动，看的我头疼，我还是喜欢 GUI 模式下 side-by-side 的模式左右分屏查看，所以我做了这个插件。
+我每次用 fugitive 查看 git 日志时，按按回车打开 commit 详情发现它都是以 unified 的形式显示每个文件的改动，就是一堆 `+` 和 `-` 符号那种，改动多时看的我头疼，我还是喜欢 GUI 下那种 side-by-side 的左右分屏模式查看，所以我做了这个插件。
 
 它既有独立运行模式，也可以很好的同 fugitive / flog / gv.vim 等插件协同工作。
 
@@ -10,7 +10,7 @@
 
 ![](https://skywind3000.github.io/images/p/gdv/flog1.png)
 
-这个插件会自动提取你光标所在行的 commit hash 然后在浮窗里展开该提交的改动列表，你按回车就弹出比较页面：
+这个插件会自动提取你光标所在行的 commit hash 然后在浮窗里展开该 commit 的改动列表，你按回车就弹出比较页面：
 
 ![](https://skywind3000.github.io/images/p/gdv/diffview.png)
 
