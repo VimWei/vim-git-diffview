@@ -1,6 +1,6 @@
 # Preface
 
-我经常用 fugitive 查看 git 日志时，每次提交详情打开它都是以 unified 的形式显示每个 commit 的改动，看的我头疼，我还是喜欢 GUI 模式下 side-by-side 的模式左右分屏查看，所以我做了这个插件。
+我经常用 fugitive 查看 git 日志时，每次打开 commit 详情都是以 unified 的形式显示每个 commit 的改动，看的我头疼，我还是喜欢 GUI 模式下 side-by-side 的模式左右分屏查看，所以我做了这个插件。
 
 它既有独立运行模式，也可以很好的同 fugitive / flog / gv.vim 等插件协同工作。
 
