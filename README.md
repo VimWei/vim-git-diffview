@@ -40,7 +40,7 @@ Plug 'skywind3000/vim-git-diffview'
 
 ![](https://skywind3000.github.io/images/p/gdv/select.png)
 
-第一列是 parent commit 的序号，第二列是 parent commit 的 hash 后面两列是文件改动状态和文件名，此时按回车就能查看具体改动文件。
+第一列是 parent commit 的序号，第二列是 parent commit 的 hash 后面两列是文件改动状态和文件名，此时按 `j`/`k` 移动光标，回车查看具体文件改动。
 
 如果没有提供 `commit` 的话，本插件会根据当前窗口和光标位置进行判断：
 
@@ -56,7 +56,7 @@ Plug 'skywind3000/vim-git-diffview'
 
 ## Keymap
 
-插件会自动在上面提到的几个页面里增加 buffer local 的 keymap，可以修改：
+插件会自动在上面提到的几个插件窗口里增加 buffer local 的 keymap，可以修改：
 
 ```viml
 let g:gdv_keymap = 'dd'
@@ -76,7 +76,7 @@ let g:gdv_tab_right = 0
 
 默认这个值是 `0` 代表在当前 tabpage 的左边打开 diffview 的 tabpage，这样比较友好，因为你关闭它后又会回到先前的 tabpage 了。
 
-改成 `1` 的话就会在右边打开 tabpage，但是关闭它会去到更右边一个 tabpage 而不会回到原来页面。
+改成 `1` 的话就会在右边打开 tabpage，但是关闭它会去到更右边一个 tabpage 而不会回到原来页面，你还需要一顿额外操作。
 
 ## Credit
 
