@@ -49,10 +49,11 @@ Plug 'skywind3000/vim-git-diffview'
 | fugitive | 日志窗口，即 `:Gclog` 显示出来的那个 quickfix 窗口 |
 | fugitive | commit 窗口，即日志窗口里按回车弹出的 commit 详情窗口 |
 | fugitive | status 窗口，即运行 `:G` 命令打开的那个提交窗口 |
+| fugitive | git log 输出窗口，即 `:Git log --oneline` 或 `:Git log --graph --oneline --all --decorate` 等命令打开的临时窗口 |
 | gv.vim | 日志窗口，就是 `:GV` 命令打开那个 | 
 | flog | 日志窗口，就是 `:Flog` 命令打开的那个 |
 
-在这些窗口上运行 `:GitDiffView` 都会根据光标位置自动识别你想对比什么东西。
+在这些窗口上运行 `:GitDiffView` 都会根据光标位置自动识别你想对比什么东西。对于 `:Git log` 命令的输出窗口，插件会自动从当前行提取 commit hash（通常是行首的第一个非空白字符串）。
 
 ## Keymap
 
