@@ -153,8 +153,28 @@ function! gdv#fugitive#current_root() abort
 			endif
 		endif
 	elseif &bt == 'nowrite' && &ft == 'git'
+		" For git log output windows, try to find git root from current context
+		" This handles both normal repos and submodules
+		let root = gdv#git#root('')
+		if root != ''
+			return root
+		endif
+		" Fallback: try to use b:git_dir if available
 		if exists('b:git_dir')
-			let root = b:git_dir
+			let git_dir = b:git_dir
+			" For git submodules, b:git_dir might point to the actual gitdir
+			" (e.g., parent/.git/modules/submodule), not the work tree
+			" Try to get work tree using git command
+			try
+				let hr = gdv#git#run('rev-parse --show-toplevel', '')
+				let work_tree = quickui#core#string_strip(hr)
+				if work_tree != '' && isdirectory(work_tree)
+					return work_tree
+				endif
+			catch
+			endtry
+			" Fallback: assume git_dir is the .git directory, get parent
+			let root = git_dir
 			if root =~ '[\\/]\.git$'
 				let root = substitute(root, '[\\/]\.git$', '', '')
 			endif
