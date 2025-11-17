@@ -72,6 +72,21 @@ function! gdv#diffview#open(where, commit, side) abort
 	let opts = {}
 	let opts.title = 'Commit Diff View ('. short . ') ' . info.date
 	let opts.hide_system_cursor = 1
+	" Try to set highlight for selected line if quickui supports it
+	" Check if quickui supports highlight option
+	if exists('*quickui#tools#clever_inputlist')
+		" Try to use a more visible highlight
+		" Some quickui versions may support 'highlight' or 'hl' option
+		if !has_key(opts, 'highlight')
+			" Use our custom highlight group if available
+			if hlexists('GdvSelectedLine')
+				let opts.highlight = 'GdvSelectedLine'
+			elseif hlexists('Search')
+				" Fallback to Search highlight which is usually more visible
+				let opts.highlight = 'Search'
+			endif
+		endif
+	endif
 	let index = quickui#tools#clever_inputlist(key, content, opts)
 	if index < 0
 		return 0
