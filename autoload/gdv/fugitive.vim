@@ -27,8 +27,35 @@ function! gdv#fugitive#root(bid) abort
 	if path != ''
 		" For submodules, git_dir might point to the actual gitdir
 		" (e.g., parent/.git/modules/submodule), not the work tree
-		" Try to get work tree using git command
-		if isdirectory(path) && filereadable(path . '/config')
+		" Check if git_dir is a gitdir (contains .git/modules/)
+		if path =~ '[\\/]\.git[\\/]modules[\\/]'
+			" This is a gitdir, extract parent path and submodule relative path
+			" Path format: d:/WeirdData/vim-init/.git/modules/pack/mydev/opt/vim-git-diffview
+			" Parent: d:/WeirdData/vim-init
+			" Submodule path: pack/mydev/opt/vim-git-diffview
+			let parent_path = substitute(path, '[\\/]\.git[\\/]modules.*$', '', '')
+			let submodule_rel_path = matchstr(path, '[\\/]\.git[\\/]modules[\\/]\zs.*$')
+			if parent_path != '' && submodule_rel_path != '' && parent_path != path
+				let work_tree = parent_path . '/' . submodule_rel_path
+				" Normalize path separators
+				if s:windows
+					let work_tree = substitute(work_tree, '/', '\', 'g')
+				endif
+				if isdirectory(work_tree)
+					" Verify this is the work tree (has .git file pointing to gitdir)
+					let git_file = work_tree . '/.git'
+					if filereadable(git_file)
+						let root = gdv#git#root(work_tree)
+						if root != ''
+							if s:windows
+								let root = quickui#core#string_replace(root, '/', '\')
+							endif
+							return root
+						endif
+					endif
+				endif
+			endif
+		elseif isdirectory(path) && filereadable(path . '/config')
 			" This is a gitdir, try to find work tree
 			" First, try to extract work tree from buffer name
 			let name_path = substitute(name, '^fugitive:[\\/][\\/]', '', '')
@@ -337,15 +364,77 @@ function! gdv#fugitive#nofile_root() abort
 			let git_dir = b:git_dir
 			" For submodules, b:git_dir might point to the actual gitdir
 			" (e.g., parent/.git/modules/submodule), not the work tree
-			" Try to get work tree using git command
-			if isdirectory(git_dir) && filereadable(git_dir . '/config')
-				" This is a gitdir, try to find work tree
-				try
-					let hr = gdv#git#run('rev-parse --show-toplevel', '')
-					let work_tree = quickui#core#string_strip(hr)
-					if work_tree != '' && isdirectory(work_tree)
-						return work_tree
+			" Check if git_dir is a gitdir (contains .git/modules/)
+			if git_dir =~ '[\\/]\.git[\\/]modules[\\/]'
+				" This is a gitdir, extract parent path and submodule relative path
+				" Path format: d:/WeirdData/vim-init/.git/modules/pack/mydev/opt/vim-git-diffview
+				" Parent: d:/WeirdData/vim-init
+				" Submodule path: pack/mydev/opt/vim-git-diffview
+				let parent_path = substitute(git_dir, '[\\/]\.git[\\/]modules.*$', '', '')
+				let submodule_rel_path = matchstr(git_dir, '[\\/]\.git[\\/]modules[\\/]\zs.*$')
+				if parent_path != '' && submodule_rel_path != '' && parent_path != git_dir
+					let work_tree = parent_path . '/' . submodule_rel_path
+					" Normalize path separators
+					if s:windows
+						let work_tree = substitute(work_tree, '/', '\', 'g')
 					endif
+					if isdirectory(work_tree)
+						" Verify this is the work tree (has .git file pointing to gitdir)
+						let git_file = work_tree . '/.git'
+						if filereadable(git_file)
+							let root = gdv#git#root(work_tree)
+							if root != ''
+								if s:windows
+									let root = quickui#core#string_replace(root, '/', '\')
+								endif
+								return root
+							endif
+						endif
+					endif
+				endif
+			elseif isdirectory(git_dir) && filereadable(git_dir . '/config')
+				" This is a gitdir, try to get work tree using git command
+				" But we need to find the work tree first
+				" Try to get work tree from a file in the gitdir
+				try
+					" Use git command to get work tree, but we need to run it in the work tree
+					" First, try to find work tree by going up from git_dir
+					let test_path = git_dir
+					while test_path != '' && test_path != fnamemodify(test_path, ':h')
+						let test_path = fnamemodify(test_path, ':h')
+						let git_file = test_path . '/.git'
+						if filereadable(git_file)
+							" Check if this .git file points to our git_dir
+							try
+								let lines = readfile(git_file)
+								if len(lines) > 0
+									let gitdir_line = quickui#core#string_strip(lines[0])
+									if gitdir_line =~ '^gitdir:\s*'
+										let gitdir_path = matchstr(gitdir_line, '^gitdir:\s*\zs.*$')
+										let gitdir_path = quickui#core#string_strip(gitdir_path)
+										if gitdir_path !~ '^[\\/]\|^\a:'
+											let gitdir_path = fnamemodify(test_path . '/' . gitdir_path, ':p')
+											let gitdir_path = substitute(gitdir_path, '[\\/]$', '', '')
+										endif
+										if s:windows
+											let gitdir_path = substitute(gitdir_path, '/', '\', 'g')
+										endif
+										if gitdir_path == git_dir || simplify(gitdir_path) == simplify(git_dir)
+											" Found the work tree
+											let root = gdv#git#root(test_path)
+											if root != ''
+												if s:windows
+													let root = quickui#core#string_replace(root, '/', '\')
+												endif
+												return root
+											endif
+										endif
+									endif
+								endif
+							catch
+							endtry
+						endif
+					endwhile
 				catch
 				endtry
 			endif
@@ -419,22 +508,91 @@ function! gdv#fugitive#current_root() abort
 			let git_dir = b:git_dir
 			" For git submodules, b:git_dir might point to the actual gitdir
 			" (e.g., parent/.git/modules/submodule), not the work tree
-			" Try to get work tree using git command
-			try
-				let hr = gdv#git#run('rev-parse --show-toplevel', '')
-				let work_tree = quickui#core#string_strip(hr)
-				if work_tree != '' && isdirectory(work_tree)
-					return work_tree
+			" Check if git_dir is a gitdir (contains .git/modules/)
+			if git_dir =~ '[\\/]\.git[\\/]modules[\\/]'
+				" This is a gitdir, extract parent path and submodule relative path
+				" Path format: d:/WeirdData/vim-init/.git/modules/pack/mydev/opt/vim-git-diffview
+				" Parent: d:/WeirdData/vim-init
+				" Submodule path: pack/mydev/opt/vim-git-diffview
+				let parent_path = substitute(git_dir, '[\\/]\.git[\\/]modules.*$', '', '')
+				let submodule_rel_path = matchstr(git_dir, '[\\/]\.git[\\/]modules[\\/]\zs.*$')
+				if parent_path != '' && submodule_rel_path != '' && parent_path != git_dir
+					let work_tree = parent_path . '/' . submodule_rel_path
+					" Normalize path separators
+					if s:windows
+						let work_tree = substitute(work_tree, '/', '\', 'g')
+					endif
+					if isdirectory(work_tree)
+						" Verify this is the work tree (has .git file pointing to gitdir)
+						let git_file = work_tree . '/.git'
+						if filereadable(git_file)
+							let root = gdv#git#root(work_tree)
+							if root != ''
+								if s:windows
+									let root = quickui#core#string_replace(root, '/', '\')
+								endif
+								return root
+							endif
+						endif
+					endif
 				endif
-			catch
-			endtry
+			elseif isdirectory(git_dir) && filereadable(git_dir . '/config')
+				" This is a gitdir, try to get work tree using git command
+				" But we need to find the work tree first
+				" Try to get work tree from a file in the gitdir
+				try
+					" Use git command to get work tree, but we need to run it in the work tree
+					" First, try to find work tree by going up from git_dir
+					let test_path = git_dir
+					while test_path != '' && test_path != fnamemodify(test_path, ':h')
+						let test_path = fnamemodify(test_path, ':h')
+						let git_file = test_path . '/.git'
+						if filereadable(git_file)
+							" Check if this .git file points to our git_dir
+							try
+								let lines = readfile(git_file)
+								if len(lines) > 0
+									let gitdir_line = quickui#core#string_strip(lines[0])
+									if gitdir_line =~ '^gitdir:\s*'
+										let gitdir_path = matchstr(gitdir_line, '^gitdir:\s*\zs.*$')
+										let gitdir_path = quickui#core#string_strip(gitdir_path)
+										if gitdir_path !~ '^[\\/]\|^\a:'
+											let gitdir_path = fnamemodify(test_path . '/' . gitdir_path, ':p')
+											let gitdir_path = substitute(gitdir_path, '[\\/]$', '', '')
+										endif
+										if s:windows
+											let gitdir_path = substitute(gitdir_path, '/', '\', 'g')
+										endif
+										if gitdir_path == git_dir || simplify(gitdir_path) == simplify(git_dir)
+											" Found the work tree
+											let root = gdv#git#root(test_path)
+											if root != ''
+												if s:windows
+													let root = quickui#core#string_replace(root, '/', '\')
+												endif
+												return root
+											endif
+										endif
+									endif
+								endif
+							catch
+							endtry
+						endif
+					endwhile
+				catch
+				endtry
+			endif
 			" Fallback: assume git_dir is the .git directory, get parent
 			let root = git_dir
 			if root =~ '[\\/]\.git$'
 				let root = substitute(root, '[\\/]\.git$', '', '')
 			endif
 			if isdirectory(root)
-				return root
+				" Verify this is a valid git repository
+				let git_path = root . '/.git'
+				if isdirectory(git_path) || filereadable(git_path)
+					return root
+				endif
 			endif
 		endif
 	endif
