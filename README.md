@@ -79,20 +79,6 @@ let g:gdv_tab_right = 0
 
 改成 `1` 的话就会在右边打开 tabpage，但是关闭它会去到更右边一个 tabpage 而不会回到原来页面，你还需要一顿额外操作。
 
-## Highlight
-
-插件会自动设置选中行的高亮，使其更加明显。如果你想要自定义选中行的颜色，可以在 `.vimrc` 中重新定义 `GdvSelectedLine` highlight group：
-
-```viml
-" 深色背景主题示例
-highlight GdvSelectedLine ctermbg=238 ctermfg=255 cterm=bold guibg=#444444 guifg=#ffffff gui=bold
-
-" 浅色背景主题示例
-highlight GdvSelectedLine ctermbg=252 ctermfg=0 cterm=bold guibg=#d0d0d0 guifg=#000000 gui=bold
-```
-
-插件会自动根据你的背景色（`&bg`）选择合适的默认颜色，但你也可以完全自定义。
-
 ## Credit
 
 TODO
