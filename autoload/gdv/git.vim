@@ -43,11 +43,17 @@ endfunc
 function! gdv#git#system(cmd, cwd) abort
 	let pwd = getcwd()
 	if a:cwd != ''
-		call quickui#core#chdir(a:cwd)
+		if isdirectory(a:cwd)
+			noautocmd call quickui#core#chdir(a:cwd)
+		else
+			let pwd = ''
+		endif
 	endif
 	let hr = quickui#utils#system(a:cmd)
 	if a:cwd != ''
-		call quickui#core#chdir(pwd)
+		if pwd != ''
+			noautocmd call quickui#core#chdir(pwd)
+		endif
 	endif
 	return hr
 endfunc
@@ -77,7 +83,37 @@ endfunc
 
 
 "----------------------------------------------------------------------
-" get git root directory
+" toplevel directory
+"----------------------------------------------------------------------
+function! gdv#git#toplevel(where) abort
+	let text = gdv#git#run('rev-parse --show-toplevel', a:where)
+	let text = quickui#core#string_strip(text)
+	return text
+endfunc
+
+
+"----------------------------------------------------------------------
+" read file safely
+"----------------------------------------------------------------------
+function! gdv#git#readfile(path) abort
+	let path = a:path
+	if stridx(path, '~') >= 0
+		let path = expand(a:path)
+	endif
+	if !filereadable(path)
+		return []
+	endif
+	try
+		let lines = readfile(path)
+		return lines
+	catch
+	endtry
+	return []
+endfunc
+
+
+"----------------------------------------------------------------------
+" get git root directory: aka. top level directory (not the .git dir)
 "----------------------------------------------------------------------
 function! gdv#git#root(where) abort
 	let place = (a:where == '')? expand('%:p') : (a:where)
@@ -86,47 +122,98 @@ function! gdv#git#root(where) abort
 		return ''
 	endif
 	let git_path = root . '/.git'
-	" Check if .git is a directory (normal git repo)
 	if isdirectory(git_path)
 		return root
-	endif
-	" Check if .git is a file (git submodule)
-	if filereadable(git_path)
-		" Read the .git file to get the gitdir path
-		try
-			let lines = readfile(git_path)
-			if len(lines) > 0
-				let gitdir_line = quickui#core#string_strip(lines[0])
-				" Check if it's a gitdir reference (format: "gitdir: <path>")
-				if gitdir_line =~ '^gitdir:\s*'
-					let gitdir_path = matchstr(gitdir_line, '^gitdir:\s*\zs.*$')
-					let gitdir_path = quickui#core#string_strip(gitdir_path)
-					" Convert relative path to absolute path
-					" Git submodule .git files use relative paths like "../../../../.git/modules/..."
-					if gitdir_path !~ '^[\\/]\|^\a:'
-						" Relative path, resolve it relative to root
-						" Use fnamemodify to properly resolve the path
-						let gitdir_path = fnamemodify(root . '/' . gitdir_path, ':p')
-						" Remove trailing path separator if present
-						let gitdir_path = substitute(gitdir_path, '[\\/]$', '', '')
-					endif
-					" Normalize path separators for Windows
-					if s:windows
-						let gitdir_path = substitute(gitdir_path, '/', '\', 'g')
-					endif
-					" Verify the gitdir exists and is a directory
-					if isdirectory(gitdir_path)
-						" This is a valid git submodule, return the work tree root
-						" Git commands should be run in the work tree (root), not in gitdir
-						return root
-					endif
-				endif
-			endif
-		catch
-			" If reading fails, it's not a valid git submodule
-		endtry
+	elseif filereadable(git_path)
+		return root
 	endif
 	return ''
+endfunc
+
+
+"----------------------------------------------------------------------
+" abspath
+"----------------------------------------------------------------------
+function! gdv#git#abspath(path) abort
+	let path = fnamemodify(a:path, ':p')
+	if path =~ '[\\/]$'
+		let path = fnamemodify(path, ':h')
+	endif
+	if s:windows
+		let path = substitute(path, '/', '\', 'g')
+	else
+		let path = substitute(path, '\\', '/', 'g')
+	endif
+	return path
+endfunc
+
+
+"----------------------------------------------------------------------
+" convert root to git path
+"----------------------------------------------------------------------
+function! gdv#git#root2git(root) abort
+	let root = gdv#git#abspath(a:root)
+	if stridx(root, '~') >= 0
+		let root = expand(root)
+	endif
+	let git_path = root . '/.git'
+	if isdirectory(git_path)
+		return gdv#git#abspath(git_path)
+	elseif filereadable(git_path)
+		let lines = gdv#git#readfile(git_path)
+		if len(lines) > 0
+			let gitdir_line = quickui#core#string_strip(lines[0])
+			if gitdir_line =~ '^gitdir:\s*'
+				let test = matchstr(gitdir_line, '^gitdir:\s*\zs.*$')
+				let test = quickui#core#string_strip(test)
+				if test !~ '^[\\/]\|^\a:'
+					let test = fnamemodify(root . '/' . test, ':p')
+				endif
+				let test = gdv#git#abspath(test)
+				if isdirectory(test)
+					return test
+				endif
+			endif
+		endif
+	endif
+	return ''
+endfunc
+
+
+"----------------------------------------------------------------------
+" convert .git directory to root path (top level directory)
+"----------------------------------------------------------------------
+function! gdv#git#git2root(gitdir) abort
+	let path = gdv#git#abspath(a:gitdir)
+	if path =~ '[\\/]\.git$'
+		let path = fnamemodify(path, ':h')
+		if isdirectory(path)
+			return path
+		endif
+	elseif path !~ '[\\/]\.git[\\/]modules[\\/]'
+		return gdv#git#toplevel(path)
+	endif
+	let config = path . '/config'
+	if !filereadable(config)
+		return gdv#git#toplevel(path)
+	endif
+	let content = gdv#git#readfile(config)
+	for line in content
+		let line = quickui#core#string_strip(line)
+		if line =~ '^\s*worktree\s*='
+			let worktree = matchstr(line, '^\s*worktree\s*=\s*\zs.*$')
+			let worktree = quickui#core#string_strip(worktree)
+			if worktree != ''
+				let worktree = path . '/' . worktree
+				let worktree = gdv#git#abspath(worktree)
+				if isdirectory(worktree)
+					return worktree
+				endif
+			endif
+			break
+		endif
+	endfor
+	return gdv#git#toplevel(path)
 endfunc
 
 
